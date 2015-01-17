@@ -12,8 +12,10 @@ object FormMain: TFormMain
   Font.Style = []
   Menu = MainMenu
   OldCreateOrder = False
+  OnClose = FormClose
   OnCreate = FormCreate
   OnDestroy = FormDestroy
+  OnShow = FormShow
   PixelsPerInch = 96
   TextHeight = 13
   object Splitter: TSplitter
@@ -66,7 +68,6 @@ object FormMain: TFormMain
     OnCreateEditor = TreeItemsCreateEditor
     OnEdited = TreeItemsEdited
     OnEditing = TreeItemsEditing
-    OnEnter = TreeItemsEnter
     OnGetText = TreeItemsGetText
     OnPaintText = TreeItemsPaintText
     Columns = <
@@ -106,6 +107,10 @@ object FormMain: TFormMain
       end
       object MenuItemFileOpen: TMenuItem
         Action = ActionFileOpen
+      end
+      object MenuItemFileRecent: TMenuItem
+        Caption = 'Recent'
+        Visible = False
       end
       object N3: TMenuItem
         Caption = '-'
@@ -171,13 +176,25 @@ object FormMain: TFormMain
     end
     object MenuItemView: TMenuItem
       Caption = '&View'
-      object MenuItemTreeView: TMenuItem
+      object MenuItemViewEditor: TMenuItem
         Action = ActionViewEditor
         AutoCheck = True
       end
-      object ree1: TMenuItem
+      object MenuItemViewTree: TMenuItem
         Action = ActionViewTree
         AutoCheck = True
+      end
+    end
+    object MenuItemTools: TMenuItem
+      Caption = '&Tools'
+      object MenuItemToolsPreferences: TMenuItem
+        Action = ActionToolsPreferences
+      end
+    end
+    object MenuItemHelp: TMenuItem
+      Caption = '&Help'
+      object MenuItemHelpAbout: TMenuItem
+        Action = ActionHelpAbout
       end
     end
   end
@@ -309,6 +326,16 @@ object FormMain: TFormMain
       Checked = True
       OnExecute = ActionViewEditorExecute
     end
+    object ActionToolsPreferences: TAction
+      Category = 'Tools'
+      Caption = '&Preferences'
+      OnExecute = ActionToolsPreferencesExecute
+    end
+    object ActionHelpAbout: TAction
+      Category = 'Help'
+      Caption = '&About'
+      OnExecute = ActionHelpAboutExecute
+    end
   end
   object SynEditSearch: TSynEditSearch
     Left = 272
@@ -365,5 +392,10 @@ object FormMain: TFormMain
     Color = clWhite
     Left = 368
     Top = 376
+  end
+  object SynEditOptionsDialog: TSynEditOptionsDialog
+    UseExtendedStrings = False
+    Left = 272
+    Top = 432
   end
 end

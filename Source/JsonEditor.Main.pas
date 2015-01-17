@@ -11,6 +11,7 @@ uses
   (* SynEdit *)
   SynEdit, SynHighlighterJSON, SynEditMiscClasses, SynEditPrint, SynEditSearch,
   SynEditPlugins, SynMacroRecorder, SynEditExport, SynExportHTML,
+  SynEditOptionsDialog,
 
   (* DWS *)
   dwsJSON, dwsJSONConnector,
@@ -56,19 +57,20 @@ type
     MenuItemFileNew: TMenuItem;
     MenuItemFileOpen: TMenuItem;
     MenuItemFilePrint: TMenuItem;
+    MenuItemFileRecent: TMenuItem;
     MenuItemFileSave: TMenuItem;
     MenuItemFileSaveAs: TMenuItem;
     MenuItemSearch: TMenuItem;
     MenuItemSearchFind: TMenuItem;
     MenuItemSearchFindNext: TMenuItem;
     MenuItemSearchReplace: TMenuItem;
-    MenuItemTreeView: TMenuItem;
     MenuItemView: TMenuItem;
+    MenuItemViewEditor: TMenuItem;
+    MenuItemViewTree: TMenuItem;
     N1: TMenuItem;
     N2: TMenuItem;
     N3: TMenuItem;
     N4: TMenuItem;
-    ree1: TMenuItem;
     Splitter: TSplitter;
     StatusBar: TStatusBar;
     SynEdit: TSynEdit;
@@ -77,13 +79,25 @@ type
     SynExporterHTML: TSynExporterHTML;
     SynMacroRecorder: TSynMacroRecorder;
     TreeItems: TVirtualStringTree;
+    MenuItemTools: TMenuItem;
+    MenuItemToolsPreferences: TMenuItem;
+    ActionToolsPreferences: TAction;
+    ActionHelpAbout: TAction;
+    MenuItemHelp: TMenuItem;
+    MenuItemHelpAbout: TMenuItem;
+    SynEditOptionsDialog: TSynEditOptionsDialog;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
+    procedure FormShow(Sender: TObject);
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure ActionFileNewExecute(Sender: TObject);
     procedure ActionFileOpenAccept(Sender: TObject);
     procedure ActionFileSaveAsAccept(Sender: TObject);
     procedure ActionFileSaveExecute(Sender: TObject);
     procedure ActionFileSaveUpdate(Sender: TObject);
+    procedure ActionFileExportAsAccept(Sender: TObject);
+    procedure ActionFilePrintExecute(Sender: TObject);
+    procedure ActionHelpAboutExecute(Sender: TObject);
     procedure ActionViewEditorExecute(Sender: TObject);
     procedure ActionViewTreeExecute(Sender: TObject);
     procedure SynEditChange(Sender: TObject);
@@ -93,19 +107,18 @@ type
     procedure TreeItemsPaintText(Sender: TBaseVirtualTree;
       const TargetCanvas: TCanvas; Node: PVirtualNode; Column: TColumnIndex;
       TextType: TVSTTextType);
-    procedure TreeItemsEnter(Sender: TObject);
     procedure TreeItemsCreateEditor(Sender: TBaseVirtualTree; Node: PVirtualNode;
       Column: TColumnIndex; out EditLink: IVTEditLink);
     procedure TreeItemsEditing(Sender: TBaseVirtualTree; Node: PVirtualNode;
       Column: TColumnIndex; var Allowed: Boolean);
     procedure TreeItemsEdited(Sender: TBaseVirtualTree; Node: PVirtualNode;
       Column: TColumnIndex);
-    procedure ActionFilePrintExecute(Sender: TObject);
-    procedure ActionFileExportAsAccept(Sender: TObject);
+    procedure ActionToolsPreferencesExecute(Sender: TObject);
   private
     FHighlighter: TSynJSON;
-    FFileName: TFileName;
+    FCurrentFileName: TFileName;
     FBase: TdwsJSONValue;
+    procedure SetCurrentFileName(const Value: TFileName);
   public
     procedure BuildTree;
 
@@ -113,6 +126,8 @@ type
     procedure SaveToFile(FileName: TFileName);
 
     procedure UpdateCaption;
+
+    property CurrentFileName: TFileName read FCurrentFileName write SetCurrentFileName;
   end;
 
 var
@@ -123,10 +138,11 @@ implementation
 {$R *.dfm}
 
 uses
-  dwsXPlatform;
+  dwsXPlatform, System.Win.Registry, JsonEditor.About;
 
 const
   CBaseCaption = 'Simple JSON Editor';
+  CRegistryKey = 'Software\SimpleJsonEditor\';
 
 { TFormMain }
 
@@ -146,10 +162,52 @@ begin
   FBase.Free;
 end;
 
+procedure TFormMain.FormShow(Sender: TObject);
+var
+  FileName: TFileName;
+begin
+  with TRegistry.Create do
+  try
+    if OpenKey(CRegistryKey, False) then
+    begin
+      if ValueExists('Recent') then
+      begin
+        FileName := ReadString('Recent');
+        if FileExists(FileName) then
+          LoadFromFile(FileName);
+      end;
+
+      if ValueExists('CaretX') then
+        SynEdit.CaretX := ReadInteger('CaretX');
+      if ValueExists('CaretY') then
+        SynEdit.CaretY := ReadInteger('CaretY');
+    end;
+    CloseKey;
+  finally
+    Free;
+  end;
+end;
+
+procedure TFormMain.FormClose(Sender: TObject; var Action: TCloseAction);
+begin
+  with TRegistry.Create do
+  try
+    if OpenKey(CRegistryKey, True) then
+    begin
+      WriteString('Recent', CurrentFileName);
+      WriteInteger('CaretX', SynEdit.CaretX);
+      WriteInteger('CaretY', SynEdit.CaretY);
+    end;
+    CloseKey;
+  finally
+    Free;
+  end;
+end;
+
 procedure TFormMain.LoadFromFile(FileName: TFileName);
 begin
   SynEdit.Text := LoadTextFromFile(FileName);
-  FFileName := FileName;
+  CurrentFileName := FileName;
   UpdateCaption;
   BuildTree;
 end;
@@ -158,7 +216,19 @@ procedure TFormMain.SaveToFile(FileName: TFileName);
 begin
   SaveTextToUTF8File(FileName, SynEdit.Text);
 
-  FFileName := FileName;
+  CurrentFileName := FileName;
+end;
+
+procedure TFormMain.SetCurrentFileName(const Value: TFileName);
+begin
+  if FCurrentFileName <> Value then
+  begin
+    FCurrentFileName := Value;
+    if FCurrentFileName <> '' then
+      ActionFileExportAs.Dialog.FileName := ChangeFileExt(FCurrentFileName, '.html')
+    else
+      ActionFileExportAs.Dialog.FileName := '';
+  end;
 end;
 
 procedure TFormMain.SynEditChange(Sender: TObject);
@@ -198,11 +268,6 @@ begin
     JsonNode := GetNodeData(Node);
     Allowed := (Column = 0) or (JsonNode.Value is TdwsJSONImmediate);
   end;
-end;
-
-procedure TFormMain.TreeItemsEnter(Sender: TObject);
-begin
-//  BuildTree;
 end;
 
 procedure TFormMain.TreeItemsGetText(Sender: TBaseVirtualTree;
@@ -260,14 +325,17 @@ end;
 
 procedure TFormMain.UpdateCaption;
 begin
-  if FFileName <> '' then
-    Caption := CBaseCaption + ' - ' + ExtractFileName(FFileName)
+  if FCurrentFileName <> '' then
+    Caption := CBaseCaption + ' - ' + ExtractFileName(FCurrentFileName)
   else
     Caption := CBaseCaption;
 end;
 
 procedure TFormMain.ActionFileExportAsAccept(Sender: TObject);
 begin
+  SynExporterHTML.Highlighter := SynEdit.Highlighter;
+  SynExporterHTML.Title := ExtractFileName(FCurrentFileName);
+  SynExporterHTML.ExportAsText := True;
   SynExporterHTML.ExportAll(SynEdit.Lines);
   SynExporterHTML.SaveToFile(TFileSaveAs(Sender).Dialog.FileName);
 end;
@@ -275,7 +343,7 @@ end;
 procedure TFormMain.ActionFileNewExecute(Sender: TObject);
 begin
   SynEdit.Clear;
-  FFileName := '';
+  CurrentFileName := '';
   UpdateCaption;
   BuildTree;
 end;
@@ -287,9 +355,9 @@ end;
 
 procedure TFormMain.ActionFilePrintExecute(Sender: TObject);
 begin
-  SynEditPrint.DocTitle := ExtractFileName(FFileName);
-  SynEditPrint.Title := ExtractFileName(FFileName);
-  SynEditPrint.Highlighter := FHighlighter;
+  SynEditPrint.Title := ExtractFileName(FCurrentFileName);
+  SynEditPrint.DocTitle := SynEditPrint.Title;
+  SynEditPrint.Highlighter := SynEdit.Highlighter;
   SynEditPrint.Print;
 end;
 
@@ -300,12 +368,33 @@ end;
 
 procedure TFormMain.ActionFileSaveExecute(Sender: TObject);
 begin
-  SaveToFile(FFileName);
+  SaveToFile(CurrentFileName);
 end;
 
 procedure TFormMain.ActionFileSaveUpdate(Sender: TObject);
 begin
-  TAction(Sender).Enabled := FFileName <> '';
+  TAction(Sender).Enabled := CurrentFileName <> '';
+end;
+
+procedure TFormMain.ActionHelpAboutExecute(Sender: TObject);
+begin
+  with TFormAbout.Create(Self) do
+  try
+    ShowModal;
+  finally
+    Free;
+  end;
+end;
+
+procedure TFormMain.ActionToolsPreferencesExecute(Sender: TObject);
+var
+  SynEditorOptionsContainer: TSynEditorOptionsContainer;
+begin
+  SynEditorOptionsContainer := TSynEditorOptionsContainer.Create(nil);
+  SynEditorOptionsContainer.Assign(SynEdit);
+  SynEditOptionsDialog.Form.Position := poMainFormCenter;
+  SynEditOptionsDialog.Execute(SynEditorOptionsContainer);
+  SynEdit.Assign(SynEditorOptionsContainer);
 end;
 
 procedure TFormMain.ActionViewEditorExecute(Sender: TObject);
@@ -411,7 +500,7 @@ begin
       end;
     end;
 
-    IterateValue(FBase, TreeItems.RootNode)
+    IterateValue(FBase, TreeItems.RootNode);
   finally
     TreeItems.EndUpdate;
   end;

@@ -3,7 +3,8 @@ program JsonEditor;
 uses
   Vcl.Forms,
   JsonEditor.Main in 'JsonEditor.Main.pas' {FormMain},
-  JsonEditor.EditLink in 'JsonEditor.EditLink.pas';
+  JsonEditor.EditLink in 'JsonEditor.EditLink.pas',
+  JsonEditor.About in 'JsonEditor.About.pas' {FormAbout};
 
 {$R *.res}
 
