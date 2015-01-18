@@ -20,7 +20,7 @@ uses
   VirtualTrees,
 
   (* Custom *)
-  JsonEditor.EditLink;
+  JsonEditor.EditLink, Vcl.ImgList, Vcl.ToolWin;
 
 type
   TFormMain = class(TForm)
@@ -86,6 +86,25 @@ type
     SynExporterHTML: TSynExporterHTML;
     SynMacroRecorder: TSynMacroRecorder;
     TreeItems: TVirtualStringTree;
+    ImageList: TImageList;
+    ToolBar1: TToolBar;
+    ToolButtonNew: TToolButton;
+    ToolButtonOpen: TToolButton;
+    ToolButtonSave: TToolButton;
+    ToolButtonExport: TToolButton;
+    ToolButton5: TToolButton;
+    ToolButton1: TToolButton;
+    ToolButton2: TToolButton;
+    ToolButton3: TToolButton;
+    ToolButton4: TToolButton;
+    ToolButton6: TToolButton;
+    ToolButton7: TToolButton;
+    ToolButton8: TToolButton;
+    ToolButton9: TToolButton;
+    ToolButton10: TToolButton;
+    ToolButton11: TToolButton;
+    ToolButton13: TToolButton;
+    ToolButton12: TToolButton;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure FormShow(Sender: TObject);
