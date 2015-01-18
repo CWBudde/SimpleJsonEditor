@@ -13,6 +13,7 @@ object FormMain: TFormMain
   Menu = MainMenu
   OldCreateOrder = False
   OnClose = FormClose
+  OnCloseQuery = FormCloseQuery
   OnCreate = FormCreate
   OnDestroy = FormDestroy
   OnShow = FormShow

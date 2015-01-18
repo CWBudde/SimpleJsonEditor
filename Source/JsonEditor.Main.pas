@@ -37,10 +37,12 @@ type
     ActionFilePrint: TAction;
     ActionFileSave: TAction;
     ActionFileSaveAs: TFileSaveAs;
+    ActionHelpAbout: TAction;
     ActionList: TActionList;
     ActionSearchFind: TSearchFind;
     ActionSearchFindNext: TSearchFindNext;
     ActionSearchReplace: TSearchReplace;
+    ActionToolsPreferences: TAction;
     ActionViewEditor: TAction;
     ActionViewTree: TAction;
     MainMenu: TMainMenu;
@@ -60,10 +62,14 @@ type
     MenuItemFileRecent: TMenuItem;
     MenuItemFileSave: TMenuItem;
     MenuItemFileSaveAs: TMenuItem;
+    MenuItemHelp: TMenuItem;
+    MenuItemHelpAbout: TMenuItem;
     MenuItemSearch: TMenuItem;
     MenuItemSearchFind: TMenuItem;
     MenuItemSearchFindNext: TMenuItem;
     MenuItemSearchReplace: TMenuItem;
+    MenuItemTools: TMenuItem;
+    MenuItemToolsPreferences: TMenuItem;
     MenuItemView: TMenuItem;
     MenuItemViewEditor: TMenuItem;
     MenuItemViewTree: TMenuItem;
@@ -74,30 +80,26 @@ type
     Splitter: TSplitter;
     StatusBar: TStatusBar;
     SynEdit: TSynEdit;
+    SynEditOptionsDialog: TSynEditOptionsDialog;
     SynEditPrint: TSynEditPrint;
     SynEditSearch: TSynEditSearch;
     SynExporterHTML: TSynExporterHTML;
     SynMacroRecorder: TSynMacroRecorder;
     TreeItems: TVirtualStringTree;
-    MenuItemTools: TMenuItem;
-    MenuItemToolsPreferences: TMenuItem;
-    ActionToolsPreferences: TAction;
-    ActionHelpAbout: TAction;
-    MenuItemHelp: TMenuItem;
-    MenuItemHelpAbout: TMenuItem;
-    SynEditOptionsDialog: TSynEditOptionsDialog;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure FormShow(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
+    procedure ActionFileExportAsAccept(Sender: TObject);
     procedure ActionFileNewExecute(Sender: TObject);
     procedure ActionFileOpenAccept(Sender: TObject);
+    procedure ActionFilePrintExecute(Sender: TObject);
     procedure ActionFileSaveAsAccept(Sender: TObject);
     procedure ActionFileSaveExecute(Sender: TObject);
     procedure ActionFileSaveUpdate(Sender: TObject);
-    procedure ActionFileExportAsAccept(Sender: TObject);
-    procedure ActionFilePrintExecute(Sender: TObject);
     procedure ActionHelpAboutExecute(Sender: TObject);
+    procedure ActionToolsPreferencesExecute(Sender: TObject);
     procedure ActionViewEditorExecute(Sender: TObject);
     procedure ActionViewTreeExecute(Sender: TObject);
     procedure SynEditChange(Sender: TObject);
@@ -113,12 +115,13 @@ type
       Column: TColumnIndex; var Allowed: Boolean);
     procedure TreeItemsEdited(Sender: TBaseVirtualTree; Node: PVirtualNode;
       Column: TColumnIndex);
-    procedure ActionToolsPreferencesExecute(Sender: TObject);
   private
     FHighlighter: TSynJSON;
     FCurrentFileName: TFileName;
+    FRecentFiles: TStringList;
     FBase: TdwsJSONValue;
     procedure SetCurrentFileName(const Value: TFileName);
+    procedure MenuItemRecentClicked(Sender: TObject);
   public
     procedure BuildTree;
 
@@ -140,6 +143,10 @@ implementation
 uses
   dwsXPlatform, System.Win.Registry, JsonEditor.About;
 
+resourcestring
+  RStrFileModified = 'The file has been modified.';
+  RStrNeedSave = 'Do you want to saved it first?';
+
 const
   CBaseCaption = 'Simple JSON Editor';
   CRegistryKey = 'Software\SimpleJsonEditor\';
@@ -153,11 +160,14 @@ begin
 
   TreeItems.NodeDataSize := SizeOf(TJsonNode);
 
+  FRecentFiles := TStringList.Create;
+
   BuildTree;
 end;
 
 procedure TFormMain.FormDestroy(Sender: TObject);
 begin
+  FRecentFiles.Free;
   TreeItems.Clear;
   FBase.Free;
 end;
@@ -165,38 +175,79 @@ end;
 procedure TFormMain.FormShow(Sender: TObject);
 var
   FileName: TFileName;
+  Index: Integer;
+  MenuItem: TMenuItem;
 begin
   with TRegistry.Create do
   try
-    if OpenKey(CRegistryKey, False) then
+    if OpenKeyReadOnly(CRegistryKey) then
     begin
-      if ValueExists('Recent') then
+      // read recent file (if present)
+      if ValueExists('RecentFile') then
       begin
-        FileName := ReadString('Recent');
+        FileName := ReadString('RecentFile');
         if FileExists(FileName) then
           LoadFromFile(FileName);
       end;
 
+      // read recent caret position
       if ValueExists('CaretX') then
         SynEdit.CaretX := ReadInteger('CaretX');
       if ValueExists('CaretY') then
         SynEdit.CaretY := ReadInteger('CaretY');
+
+      // read recent file list
+      FRecentFiles.Clear;
+      if KeyExists('Recent') then
+      begin
+        OpenKeyReadOnly('Recent');
+        Index := 0;
+        while ValueExists(IntToStr(Index)) do
+        begin
+          FRecentFiles.Add(ReadString(IntToStr(Index)));
+          Inc(Index);
+        end;
+      end;
     end;
     CloseKey;
   finally
     Free;
   end;
+
+  // only allow 10 entries
+  while FRecentFiles.Count > 10 do
+    FRecentFiles.Delete(10);
+
+  for Index := 0 to FRecentFiles.Count - 1 do
+  begin
+    MenuItem := TMenuItem.Create(MenuItemFileRecent);
+    MenuItem.Caption := ExtractFileName(FRecentFiles[Index]);
+    MenuItem.Tag := Index;
+    MenuItem.OnClick := MenuItemRecentClicked;
+    MenuItemFileRecent.Add(MenuItem);
+  end;
+  MenuItemFileRecent.Visible := MenuItemFileRecent.Count > 0;
 end;
 
 procedure TFormMain.FormClose(Sender: TObject; var Action: TCloseAction);
+var
+  Index: Integer;
 begin
   with TRegistry.Create do
   try
     if OpenKey(CRegistryKey, True) then
     begin
-      WriteString('Recent', CurrentFileName);
+      WriteString('RecentFile', CurrentFileName);
       WriteInteger('CaretX', SynEdit.CaretX);
       WriteInteger('CaretY', SynEdit.CaretY);
+
+      if FRecentFiles.Count > 0 then
+      begin
+        OpenKey('Recent', True);
+
+        for Index := 0 to FRecentFiles.Count - 1 do
+          WriteString(IntToStr(Index), FRecentFiles[Index]);
+      end;
     end;
     CloseKey;
   finally
@@ -204,28 +255,59 @@ begin
   end;
 end;
 
+procedure TFormMain.FormCloseQuery(Sender: TObject; var CanClose: Boolean);
+begin
+  if SynEdit.Modified then
+    case MessageDlg(RStrFileModified + #13#10#13#10 + RStrNeedSave,
+      mtConfirmation, [mbYes, mbNo, mbAbort], 0) of
+      mrYes:
+        ActionFileSaveAs.Execute;
+      mrAbort:
+        CanClose := False;
+    end;
+end;
+
 procedure TFormMain.LoadFromFile(FileName: TFileName);
 begin
   SynEdit.Text := LoadTextFromFile(FileName);
+  SynEdit.Modified := False;
   CurrentFileName := FileName;
   UpdateCaption;
   BuildTree;
 end;
 
+procedure TFormMain.MenuItemRecentClicked(Sender: TObject);
+var
+  FileName: TFileName;
+begin
+  FileName := FRecentFiles[TMenuItem(Sender).Tag];
+  if FileExists(FileName) then
+    LoadFromFile(FileName);
+end;
+
 procedure TFormMain.SaveToFile(FileName: TFileName);
 begin
   SaveTextToUTF8File(FileName, SynEdit.Text);
-
+  SynEdit.Modified := False;
   CurrentFileName := FileName;
 end;
 
 procedure TFormMain.SetCurrentFileName(const Value: TFileName);
+var
+  Index: Integer;
 begin
   if FCurrentFileName <> Value then
   begin
     FCurrentFileName := Value;
     if FCurrentFileName <> '' then
-      ActionFileExportAs.Dialog.FileName := ChangeFileExt(FCurrentFileName, '.html')
+    begin
+      ActionFileExportAs.Dialog.FileName := ChangeFileExt(FCurrentFileName, '.html');
+      Index := FRecentFiles.IndexOf(FCurrentFileName);
+      if Index >= 0 then
+        FRecentFiles.Delete(Index);
+
+      FRecentFiles.Insert(0, FCurrentFileName);
+    end
     else
       ActionFileExportAs.Dialog.FileName := '';
   end;
@@ -342,7 +424,17 @@ end;
 
 procedure TFormMain.ActionFileNewExecute(Sender: TObject);
 begin
+  if SynEdit.Modified then
+    case MessageDlg(RStrFileModified + #13#10#13#10 + RStrNeedSave,
+      mtConfirmation, [mbYes, mbNo, mbAbort], 0) of
+      mrYes:
+        ActionFileSaveAs.Execute;
+      mrAbort:
+        Exit;
+    end;
+
   SynEdit.Clear;
+  SynEdit.Modified := False;
   CurrentFileName := '';
   UpdateCaption;
   BuildTree;
@@ -350,6 +442,15 @@ end;
 
 procedure TFormMain.ActionFileOpenAccept(Sender: TObject);
 begin
+  if SynEdit.Modified then
+    case MessageDlg(RStrFileModified + #13#10#13#10 + RStrNeedSave,
+      mtConfirmation, [mbYes, mbNo, mbAbort], 0) of
+      mrYes:
+        ActionFileSaveAs.Execute;
+      mrAbort:
+        Exit;
+    end;
+
   LoadFromFile(TFileSaveAs(Sender).Dialog.FileName);
 end;
 
