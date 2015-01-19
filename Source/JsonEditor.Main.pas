@@ -143,6 +143,7 @@ type
     procedure MenuItemRecentClicked(Sender: TObject);
   public
     procedure BuildTree;
+    procedure RebuildJSON;
 
     procedure LoadFromFile(FileName: TFileName);
     procedure SaveToFile(FileName: TFileName);
@@ -304,6 +305,45 @@ begin
     LoadFromFile(FileName);
 end;
 
+procedure TFormMain.RebuildJSON;
+var
+  NewJSON: TdwsJSONObject;
+
+  procedure IterateNodes(ParentNode: PVirtualNode; ParentValue: TdwsJSONValue);
+  var
+    Node: PVirtualNode;
+    JsonNode: PJsonNode;
+    NewValue: TdwsJSONValue;
+  begin
+    for Node in TreeItems.ChildNodes(ParentNode) do
+    begin
+      JsonNode := TreeItems.GetNodeData(Node);
+
+      // handle leafs
+      if JsonNode.Value is TdwsJSONImmediate then
+        NewValue := JsonNode^.Value.Clone
+      else
+        NewValue := TdwsJSONValue(JsonNode.Value.ClassType.Create);
+
+      Assert(ParentValue is TdwsJSONValue);
+      Assert(not (ParentValue is TdwsJSONImmediate));
+      if ParentValue is TdwsJSONArray then
+        TdwsJSONArray(ParentValue).Add(NewValue)
+      else
+        TdwsJSONObject(ParentValue).Add(JsonNode^.Name, NewValue);
+
+      IterateNodes(Node, NewValue);
+      JsonNode^.Value := NewValue;
+    end;
+  end;
+
+begin
+  NewJSON := TdwsJSONObject.Create;
+  IterateNodes(TreeItems.RootNode, NewJson);
+  FBase.Free;
+  FBase := NewJSON;
+end;
+
 procedure TFormMain.SaveToFile(FileName: TFileName);
 begin
   SaveTextToUTF8File(FileName, SynEdit.Text);
@@ -356,7 +396,10 @@ procedure TFormMain.TreeItemsEdited(Sender: TBaseVirtualTree; Node: PVirtualNode
   Column: TColumnIndex);
 begin
   if SynEdit.Visible then
+  begin
+    RebuildJSON;
     SynEdit.Text := FBase.ToBeautifiedString;
+  end;
 end;
 
 procedure TFormMain.TreeItemsEditing(Sender: TBaseVirtualTree;
@@ -419,7 +462,9 @@ begin
               TargetCanvas.Font.Color := FHighlighter.KeywordAttribute.Foreground;
               TargetCanvas.Font.Style := FHighlighter.KeywordAttribute.Style;
             end;
-          end;
+          end
+        else
+          TargetCanvas.Font.Color := clGrayText;
       end;
   end;
 end;
@@ -570,8 +615,13 @@ procedure TFormMain.BuildTree;
     begin
       Node := TreeItems.AddChild(ParentNode);
       JsonNode := TreeItems.GetNodeData(Node);
+      JsonNode^.Value := Value.Elements[Index];
+      JsonNode^.Name := Value.Names[Index];
+
+(*
       JsonNode^.Index := Index;
       JsonNode^.Parent := Value;
+*)
       IterateValue(Value.Elements[Index], Node);
     end;
   end;

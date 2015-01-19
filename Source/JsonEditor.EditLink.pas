@@ -16,6 +16,7 @@ uses
 
 type
   TJsonNode = record
+(*
   private
     function GetName: string;
     function GetValue: TdwsJSONValue;
@@ -25,6 +26,9 @@ type
 
     property Value: TdwsJSONValue read GetValue;
     property Name: string read GetName;
+*)
+    Value: TdwsJSONValue;
+    Name: string;
   end;
   PJsonNode = ^TJsonNode;
 
@@ -52,6 +56,7 @@ type
 
 implementation
 
+(*
 { TJsonNode }
 
 function TJsonNode.GetName: string;
@@ -63,6 +68,7 @@ function TJsonNode.GetValue: TdwsJSONValue;
 begin
   Result := Parent.Elements[Index];
 end;
+*)
 
 
 { TPropertyEditLink }
@@ -143,13 +149,13 @@ end;
 
 function TPropertyEditLink.EndEdit: Boolean;
 var
-  Data: PJsonNode;
+  JsonNode: PJsonNode;
   Buffer: array[0..1024] of Char;
   S: UnicodeString;
 begin
   Result := True;
 
-  Data := FTree.GetNodeData(FNode);
+  JsonNode := FTree.GetNodeData(FNode);
   if FControl is TComboBox then
     S := TComboBox(FControl).Text
   else
@@ -161,31 +167,28 @@ begin
   case FColumn of
     0:
       begin
-        if S <> Data.Name then
+        if S <> JsonNode.Name then
         begin
-(*
-          Data.Name := S;
-          Data.Changed := True;
-*)
+          JsonNode.Name := S;
           FTree.InvalidateNode(FNode);
         end;
       end;
     1:
       begin
-        case Data.Value.ValueType of
+        case JsonNode.Value.ValueType of
           jvtString:
             begin
-              Data.Value.AsString := S;
+              JsonNode.Value.AsString := S;
               FTree.InvalidateNode(FNode);
             end;
           jvtNumber:
             begin
-              Data.Value.AsNumber := StrToFloat(S);
+              JsonNode.Value.AsNumber := StrToFloat(S);
               FTree.InvalidateNode(FNode);
             end;
           jvtBoolean:
             begin
-              Data.Value.AsBoolean := SameText(S, 'true');
+              JsonNode.Value.AsBoolean := SameText(S, 'true');
               FTree.InvalidateNode(FNode);
             end;
         end;
