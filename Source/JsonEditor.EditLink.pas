@@ -16,17 +16,6 @@ uses
 
 type
   TJsonNode = record
-(*
-  private
-    function GetName: string;
-    function GetValue: TdwsJSONValue;
-  public
-    Parent: TdwsJSONValue;
-    Index: Integer;
-
-    property Value: TdwsJSONValue read GetValue;
-    property Name: string read GetName;
-*)
     Value: TdwsJSONValue;
     Name: string;
   end;
@@ -55,21 +44,6 @@ type
   end;
 
 implementation
-
-(*
-{ TJsonNode }
-
-function TJsonNode.GetName: string;
-begin
-  Result := Parent.Names[Index];
-end;
-
-function TJsonNode.GetValue: TdwsJSONValue;
-begin
-  Result := Parent.Elements[Index];
-end;
-*)
-
 
 { TPropertyEditLink }
 

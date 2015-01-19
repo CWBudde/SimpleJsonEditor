@@ -63,14 +63,17 @@ object FormMain: TFormMain
     Header.Font.Style = []
     Header.Height = 22
     Header.Options = [hoAutoResize, hoColumnResize, hoDrag, hoShowSortGlyphs, hoVisible]
+    PopupMenu = PopupMenu
     TabOrder = 1
-    TreeOptions.MiscOptions = [toAcceptOLEDrop, toEditable, toFullRepaintOnResize, toInitOnSave, toToggleOnDblClick, toWheelPanning, toEditOnClick]
+    TreeOptions.MiscOptions = [toAcceptOLEDrop, toEditable, toFullRepaintOnResize, toInitOnSave, toToggleOnDblClick, toWheelPanning, toEditOnClick, toEditOnDblClick]
     TreeOptions.SelectionOptions = [toExtendedFocus]
     OnCreateEditor = TreeItemsCreateEditor
     OnEdited = TreeItemsEdited
     OnEditing = TreeItemsEditing
+    OnFreeNode = TreeItemsFreeNode
     OnGetText = TreeItemsGetText
     OnPaintText = TreeItemsPaintText
+    OnKeyDown = TreeItemsKeyDown
     Columns = <
       item
         Options = [coAllowClick, coDraggable, coEnabled, coParentBidiMode, coParentColor, coResizable, coShowDropMark, coVisible, coSmartResize, coAllowFocus, coEditable]
@@ -98,13 +101,13 @@ object FormMain: TFormMain
         Width = 50
       end>
   end
-  object ToolBar1: TToolBar
+  object ToolBar: TToolBar
     Left = 0
     Top = 0
     Width = 1028
     Height = 22
     AutoSize = True
-    Caption = 'ToolBar1'
+    Caption = 'ToolBar'
     DrawingStyle = dsGradient
     Images = ImageList
     GradientDrawingOptions = [gdoHotTrack]
@@ -130,77 +133,82 @@ object FormMain: TFormMain
       Top = 0
       Action = ActionFileExportAs
     end
-    object ToolButton5: TToolButton
+    object ToolButtonExit: TToolButton
       Left = 92
       Top = 0
       Action = ActionFileExit
     end
-    object ToolButton1: TToolButton
+    object ToolButtonSeparator1: TToolButton
       Left = 115
       Top = 0
       Width = 8
-      Caption = 'ToolButton1'
+      Caption = 'ToolButtonSeparator1'
       ImageIndex = 5
       Style = tbsSeparator
     end
-    object ToolButton2: TToolButton
+    object ToolButtonUndo: TToolButton
       Left = 123
       Top = 0
       Action = ActionEditUndo
     end
-    object ToolButton3: TToolButton
+    object ToolButtonCut: TToolButton
       Left = 146
       Top = 0
       Action = ActionEditCut
     end
-    object ToolButton4: TToolButton
+    object ToolButtonCopy: TToolButton
       Left = 169
       Top = 0
       Action = ActionEditCopy
     end
-    object ToolButton6: TToolButton
+    object ToolButtonPaste: TToolButton
       Left = 192
       Top = 0
       Action = ActionEditPaste
     end
-    object ToolButton7: TToolButton
+    object ToolButtonDelete: TToolButton
       Left = 215
       Top = 0
       Action = ActionEditDelete
     end
-    object ToolButton8: TToolButton
+    object ToolButtonSelectAll: TToolButton
       Left = 238
       Top = 0
       Action = ActionEditSelectAll
     end
-    object ToolButton9: TToolButton
+    object ToolButtonSeparator2: TToolButton
       Left = 261
       Top = 0
       Width = 8
-      Caption = 'ToolButton9'
+      Caption = 'ToolButtonSeparator2'
       ImageIndex = 10
       Style = tbsSeparator
     end
-    object ToolButton10: TToolButton
+    object ToolButtonFind: TToolButton
       Left = 269
       Top = 0
       Action = ActionSearchFind
     end
-    object ToolButton11: TToolButton
+    object ToolButtonFindNext: TToolButton
       Left = 292
       Top = 0
       Action = ActionSearchFindNext
     end
-    object ToolButton12: TToolButton
+    object ToolButtonFindReplace: TToolButton
       Left = 315
       Top = 0
+      Action = ActionSearchReplace
+    end
+    object ToolButtonSeparator3: TToolButton
+      Left = 338
+      Top = 0
       Width = 8
-      Caption = 'ToolButton12'
+      Caption = 'ToolButtonSeparator3'
       ImageIndex = 14
       Style = tbsSeparator
     end
-    object ToolButton13: TToolButton
-      Left = 323
+    object ToolButtonAbout: TToolButton
+      Left = 346
       Top = 0
       Action = ActionHelpAbout
     end
@@ -450,6 +458,24 @@ object FormMain: TFormMain
       Caption = '&About'
       ImageIndex = 15
       OnExecute = ActionHelpAboutExecute
+    end
+    object ActionNodeAddValue: TAction
+      Caption = 'Add &Value'
+      OnExecute = ActionNodeAddValueExecute
+    end
+    object ActionNodeAddObject: TAction
+      Tag = 2
+      Caption = 'Add &Object'
+      OnExecute = ActionNodeAddObjectArrayExecute
+    end
+    object ActionNodeAddArray: TAction
+      Tag = 1
+      Caption = 'Add &Array'
+      OnExecute = ActionNodeAddObjectArrayExecute
+    end
+    object ActionNodeDelete: TAction
+      Caption = '&Delete'
+      OnExecute = ActionNodeDeleteExecute
     end
   end
   object SynEditSearch: TSynEditSearch
@@ -1317,5 +1343,24 @@ object FormMain: TFormMain
       0000000000000000000000000000000000000000000000000000000000000000
       0000000000000000000000000000000000000000000000000000000000000000
       000000000000}
+  end
+  object PopupMenu: TPopupMenu
+    Left = 464
+    Top = 264
+    object MenuItemAddNode: TMenuItem
+      Action = ActionNodeAddValue
+    end
+    object MenuItemAddObject: TMenuItem
+      Action = ActionNodeAddObject
+    end
+    object MenuItemAddArray: TMenuItem
+      Action = ActionNodeAddArray
+    end
+    object N5: TMenuItem
+      Caption = '-'
+    end
+    object MenuItemDelete: TMenuItem
+      Action = ActionNodeDelete
+    end
   end
 end

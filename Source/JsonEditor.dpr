@@ -4,7 +4,8 @@ uses
   Vcl.Forms,
   JsonEditor.Main in 'JsonEditor.Main.pas' {FormMain},
   JsonEditor.EditLink in 'JsonEditor.EditLink.pas',
-  JsonEditor.About in 'JsonEditor.About.pas' {FormAbout};
+  JsonEditor.About in 'JsonEditor.About.pas' {FormAbout},
+  JsonEditor.AddDialog in 'JsonEditor.AddDialog.pas' {FormAddDialog};
 
 {$R *.res}
 

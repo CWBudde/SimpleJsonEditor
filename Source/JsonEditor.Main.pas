@@ -23,6 +23,12 @@ uses
   JsonEditor.EditLink, Vcl.ImgList, Vcl.ToolWin;
 
 type
+  TVirtualStringTree = class(VirtualTrees.TVirtualStringTree)
+  public
+    // override the flawed standard action handling
+    function ExecuteAction(Action: TBasicAction): Boolean; override;
+  end;
+
   TFormMain = class(TForm)
     ActionEditCopy: TEditCopy;
     ActionEditCut: TEditCut;
@@ -39,13 +45,22 @@ type
     ActionFileSaveAs: TFileSaveAs;
     ActionHelpAbout: TAction;
     ActionList: TActionList;
+    ActionNodeAddArray: TAction;
+    ActionNodeAddObject: TAction;
+    ActionNodeAddValue: TAction;
+    ActionNodeDelete: TAction;
     ActionSearchFind: TSearchFind;
     ActionSearchFindNext: TSearchFindNext;
     ActionSearchReplace: TSearchReplace;
     ActionToolsPreferences: TAction;
     ActionViewEditor: TAction;
     ActionViewTree: TAction;
+    ImageList: TImageList;
     MainMenu: TMainMenu;
+    MenuItemAddArray: TMenuItem;
+    MenuItemAddNode: TMenuItem;
+    MenuItemAddObject: TMenuItem;
+    MenuItemDelete: TMenuItem;
     MenuItemEdit: TMenuItem;
     MenuItemEditCopy: TMenuItem;
     MenuItemEditCut: TMenuItem;
@@ -77,6 +92,8 @@ type
     N2: TMenuItem;
     N3: TMenuItem;
     N4: TMenuItem;
+    N5: TMenuItem;
+    PopupMenu: TPopupMenu;
     Splitter: TSplitter;
     StatusBar: TStatusBar;
     SynEdit: TSynEdit;
@@ -85,39 +102,42 @@ type
     SynEditSearch: TSynEditSearch;
     SynExporterHTML: TSynExporterHTML;
     SynMacroRecorder: TSynMacroRecorder;
-    TreeItems: TVirtualStringTree;
-    ImageList: TImageList;
-    ToolBar1: TToolBar;
+    ToolBar: TToolBar;
+    ToolButtonAbout: TToolButton;
+    ToolButtonCopy: TToolButton;
+    ToolButtonCut: TToolButton;
+    ToolButtonDelete: TToolButton;
+    ToolButtonExit: TToolButton;
+    ToolButtonExport: TToolButton;
+    ToolButtonFind: TToolButton;
+    ToolButtonFindNext: TToolButton;
+    ToolButtonFindReplace: TToolButton;
     ToolButtonNew: TToolButton;
     ToolButtonOpen: TToolButton;
+    ToolButtonPaste: TToolButton;
     ToolButtonSave: TToolButton;
-    ToolButtonExport: TToolButton;
-    ToolButton5: TToolButton;
-    ToolButton1: TToolButton;
-    ToolButton2: TToolButton;
-    ToolButton3: TToolButton;
-    ToolButton4: TToolButton;
-    ToolButton6: TToolButton;
-    ToolButton7: TToolButton;
-    ToolButton8: TToolButton;
-    ToolButton9: TToolButton;
-    ToolButton10: TToolButton;
-    ToolButton11: TToolButton;
-    ToolButton13: TToolButton;
-    ToolButton12: TToolButton;
+    ToolButtonSelectAll: TToolButton;
+    ToolButtonSeparator1: TToolButton;
+    ToolButtonSeparator2: TToolButton;
+    ToolButtonSeparator3: TToolButton;
+    ToolButtonUndo: TToolButton;
+    TreeItems: TVirtualStringTree;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure FormShow(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
-    procedure ActionFileExportAsAccept(Sender: TObject);
     procedure ActionFileNewExecute(Sender: TObject);
     procedure ActionFileOpenAccept(Sender: TObject);
+    procedure ActionFileExportAsAccept(Sender: TObject);
     procedure ActionFilePrintExecute(Sender: TObject);
     procedure ActionFileSaveAsAccept(Sender: TObject);
     procedure ActionFileSaveExecute(Sender: TObject);
     procedure ActionFileSaveUpdate(Sender: TObject);
     procedure ActionHelpAboutExecute(Sender: TObject);
+    procedure ActionNodeAddObjectArrayExecute(Sender: TObject);
+    procedure ActionNodeAddValueExecute(Sender: TObject);
+    procedure ActionNodeDeleteExecute(Sender: TObject);
     procedure ActionToolsPreferencesExecute(Sender: TObject);
     procedure ActionViewEditorExecute(Sender: TObject);
     procedure ActionViewTreeExecute(Sender: TObject);
@@ -134,6 +154,9 @@ type
       Column: TColumnIndex; var Allowed: Boolean);
     procedure TreeItemsEdited(Sender: TBaseVirtualTree; Node: PVirtualNode;
       Column: TColumnIndex);
+    procedure TreeItemsFreeNode(Sender: TBaseVirtualTree; Node: PVirtualNode);
+    procedure TreeItemsKeyDown(Sender: TObject; var Key: Word;
+      Shift: TShiftState);
   private
     FHighlighter: TSynJSON;
     FCurrentFileName: TFileName;
@@ -142,7 +165,9 @@ type
     procedure SetCurrentFileName(const Value: TFileName);
     procedure MenuItemRecentClicked(Sender: TObject);
   public
-    procedure BuildTree;
+    procedure UpdateTree;
+    procedure UpdateEditor;
+
     procedure RebuildJSON;
 
     procedure LoadFromFile(FileName: TFileName);
@@ -161,7 +186,7 @@ implementation
 {$R *.dfm}
 
 uses
-  dwsXPlatform, System.Win.Registry, JsonEditor.About;
+  dwsXPlatform, System.Win.Registry, JsonEditor.About, JsonEditor.AddDialog;
 
 resourcestring
   RStrFileModified = 'The file has been modified.';
@@ -170,6 +195,19 @@ resourcestring
 const
   CBaseCaption = 'Simple JSON Editor';
   CRegistryKey = 'Software\SimpleJsonEditor\';
+
+{ TVirtualStringTree }
+
+function TVirtualStringTree.ExecuteAction(Action: TBasicAction): Boolean;
+begin
+  Result := True;
+
+  if Action is TEditDelete then
+    FormMain.ActionNodeDelete.Execute
+  else
+    Result := inherited ExecuteAction(Action);
+end;
+
 
 { TFormMain }
 
@@ -181,8 +219,6 @@ begin
   TreeItems.NodeDataSize := SizeOf(TJsonNode);
 
   FRecentFiles := TStringList.Create;
-
-  BuildTree;
 end;
 
 procedure TFormMain.FormDestroy(Sender: TObject);
@@ -293,7 +329,7 @@ begin
   SynEdit.Modified := False;
   CurrentFileName := FileName;
   UpdateCaption;
-  BuildTree;
+  UpdateTree;
 end;
 
 procedure TFormMain.MenuItemRecentClicked(Sender: TObject);
@@ -375,7 +411,7 @@ end;
 procedure TFormMain.SynEditChange(Sender: TObject);
 begin
   if TreeItems.Visible then
-    BuildTree;
+    UpdateTree;
 end;
 
 procedure TFormMain.SynEditStatusChange(Sender: TObject;
@@ -392,14 +428,10 @@ begin
   EditLink := TPropertyEditLink.Create;
 end;
 
-procedure TFormMain.TreeItemsEdited(Sender: TBaseVirtualTree; Node: PVirtualNode;
-  Column: TColumnIndex);
+procedure TFormMain.TreeItemsEdited(Sender: TBaseVirtualTree;
+  Node: PVirtualNode; Column: TColumnIndex);
 begin
-  if SynEdit.Visible then
-  begin
-    RebuildJSON;
-    SynEdit.Text := FBase.ToBeautifiedString;
-  end;
+  UpdateEditor;
 end;
 
 procedure TFormMain.TreeItemsEditing(Sender: TBaseVirtualTree;
@@ -412,6 +444,15 @@ begin
     JsonNode := GetNodeData(Node);
     Allowed := (Column = 0) or (JsonNode.Value is TdwsJSONImmediate);
   end;
+end;
+
+procedure TFormMain.TreeItemsFreeNode(Sender: TBaseVirtualTree;
+  Node: PVirtualNode);
+var
+  NodeData: PJsonNode;
+begin
+  NodeData := Sender.GetNodeData(Node);
+  Finalize(NodeData^);
 end;
 
 procedure TFormMain.TreeItemsGetText(Sender: TBaseVirtualTree;
@@ -433,6 +474,15 @@ begin
         CellText := JsonNode^.Value.AsString
       else
         CellText := JsonNode^.Value.ToString;
+  end;
+end;
+
+procedure TFormMain.TreeItemsKeyDown(Sender: TObject; var Key: Word;
+  Shift: TShiftState);
+begin
+  case Key of
+    VK_DELETE:
+      ActionNodeDelete.Execute;
   end;
 end;
 
@@ -501,7 +551,7 @@ begin
   SynEdit.Modified := False;
   CurrentFileName := '';
   UpdateCaption;
-  BuildTree;
+  UpdateTree;
 end;
 
 procedure TFormMain.ActionFileOpenAccept(Sender: TObject);
@@ -551,6 +601,158 @@ begin
   end;
 end;
 
+procedure TFormMain.ActionNodeAddObjectArrayExecute(Sender: TObject);
+
+  function CreateArrayOrObject: TdwsJSONValue;
+  begin
+    Result := nil;
+    Assert(TAction(Sender).Tag in [1, 2]);
+    case TAction(Sender).Tag of
+      1:
+        Result := TdwsJSONArray.Create;
+      2:
+        Result := TdwsJSONObject.Create;
+    end;
+  end;
+
+var
+  Node: PVirtualNode;
+  JsonNode: PJsonNode;
+  Value, ParentValue: TdwsJSONValue;
+begin
+  Node := TreeItems.FocusedNode;
+  if Node = nil then
+  begin
+    Node := TreeItems.RootNode;
+    ParentValue := FBase;
+  end
+  else
+  begin
+    JsonNode := TreeItems.GetNodeData(Node);
+    ParentValue := JsonNode.Value;
+
+    // check for immediate value
+    if ParentValue is TdwsJSONImmediate then
+    begin
+      Node := Node.Parent;
+      JsonNode := TreeItems.GetNodeData(Node);
+      if Assigned(JsonNode) then
+        ParentValue := JsonNode.Value
+      else
+        ParentValue := FBase;
+    end;
+  end;
+
+  // handle array parent value
+  if ParentValue is TdwsJSONArray then
+  begin
+    Value := CreateArrayOrObject;
+    TdwsJSONArray(ParentValue).Add(Value);
+
+    // add node and link node to object
+    Node := TreeItems.AddChild(Node);
+    JsonNode := TreeItems.GetNodeData(Node);
+    JsonNode^.Value := Value;
+    JsonNode^.Name := IntToStr(TdwsJSONArray(Parent).ElementCount - 1);
+
+    UpdateEditor;
+    Exit;
+  end;
+
+  // the parent value must be an object
+  Assert(ParentValue is TdwsJSONObject);
+
+  with TFormAddDialog.Create(Self) do
+  try
+    LabelValue.Visible := False;
+    EditValue.Visible := False;
+    if ShowModal = mrOk then
+    begin
+      Value := CreateArrayOrObject;
+      TdwsJSONObject(ParentValue).Add(EditName.Text, Value);
+
+      // add node and link node to object
+      Node := TreeItems.AddChild(Node);
+      JsonNode := TreeItems.GetNodeData(Node);
+      JsonNode^.Value := Value;
+      JsonNode^.Name := EditName.Text;
+      UpdateEditor;
+    end;
+  finally
+    Free;
+  end;
+end;
+
+procedure TFormMain.ActionNodeAddValueExecute(Sender: TObject);
+var
+  Node: PVirtualNode;
+  JsonNode: PJsonNode;
+  Value, ParentValue: TdwsJSONValue;
+begin
+  Node := TreeItems.FocusedNode;
+  if Node = nil then
+  begin
+    Node := TreeItems.RootNode;
+    ParentValue := FBase;
+  end
+  else
+  begin
+    JsonNode := TreeItems.GetNodeData(Node);
+    ParentValue := JsonNode.Value;
+
+    // check for immediate value
+    if ParentValue is TdwsJSONImmediate then
+    begin
+      Node := Node.Parent;
+      JsonNode := TreeItems.GetNodeData(Node);
+      if Assigned(JsonNode) then
+        ParentValue := JsonNode.Value
+      else
+        ParentValue := FBase;
+    end;
+  end;
+
+  with TFormAddDialog.Create(Self) do
+  try
+    if ParentValue is TdwsJSONArray then
+    begin
+      LabelName.Visible := False;
+      EditName.Visible := False;
+    end;
+
+    if ShowModal = mrOk then
+    begin
+      // add array
+      Value := TdwsJSONImmediate.Create;
+      Value.AsString := EditValue.Text;
+      if ParentValue is TdwsJSONArray then
+        TdwsJSONArray(ParentValue).Add(Value)
+      else
+        TdwsJSONObject(ParentValue).Add(EditName.Text, Value);
+
+      // add node and link node to object
+      Node := TreeItems.AddChild(Node);
+      JsonNode := TreeItems.GetNodeData(Node);
+      JsonNode^.Value := Value;
+      JsonNode^.Name := EditName.Text;
+      UpdateEditor;
+    end;
+  finally
+    Free;
+  end;
+end;
+
+procedure TFormMain.ActionNodeDeleteExecute(Sender: TObject);
+begin
+  if not Assigned(TreeItems.FocusedNode) then
+    Exit;
+
+  TreeItems.DeleteNode(TreeItems.FocusedNode);
+
+  if SynEdit.Visible then
+    UpdateEditor;
+end;
+
 procedure TFormMain.ActionToolsPreferencesExecute(Sender: TObject);
 var
   SynEditorOptionsContainer: TSynEditorOptionsContainer;
@@ -588,7 +790,7 @@ begin
   TreeItems.Visible := TAction(Sender).Checked;
   if TreeItems.Visible then
   begin
-    BuildTree;
+    UpdateTree;
     if SynEdit.Visible then
     begin
       TreeItems.Align := alRight;
@@ -603,7 +805,13 @@ begin
   end;
 end;
 
-procedure TFormMain.BuildTree;
+procedure TFormMain.UpdateEditor;
+begin
+  RebuildJSON;
+  SynEdit.Text := FBase.ToBeautifiedString;
+end;
+
+procedure TFormMain.UpdateTree;
 
   procedure IterateValue(Value: TdwsJSONValue; ParentNode: PVirtualNode);
   var
@@ -617,11 +825,6 @@ procedure TFormMain.BuildTree;
       JsonNode := TreeItems.GetNodeData(Node);
       JsonNode^.Value := Value.Elements[Index];
       JsonNode^.Name := Value.Names[Index];
-
-(*
-      JsonNode^.Index := Index;
-      JsonNode^.Parent := Value;
-*)
       IterateValue(Value.Elements[Index], Node);
     end;
   end;
