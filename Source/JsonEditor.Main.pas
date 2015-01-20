@@ -6,7 +6,7 @@ uses
   (* Delphi *)
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Classes,
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.ExtCtrls, Vcl.Menus,
-  Vcl.ActnList, Vcl.StdActns, Vcl.ComCtrls,
+  Vcl.ActnList, Vcl.StdActns, Vcl.ComCtrls, Vcl.ImgList, Vcl.ToolWin,
 
   (* SynEdit *)
   SynEdit, SynHighlighterJSON, SynEditMiscClasses, SynEditPrint, SynEditSearch,
@@ -20,7 +20,7 @@ uses
   VirtualTrees,
 
   (* Custom *)
-  JsonEditor.EditLink, Vcl.ImgList, Vcl.ToolWin;
+  JsonEditor.EditLink, JsonEditor.AddDialog;
 
 type
   TVirtualStringTree = class(VirtualTrees.TVirtualStringTree)
@@ -161,6 +161,7 @@ type
     FHighlighter: TSynJSON;
     FCurrentFileName: TFileName;
     FRecentFiles: TStringList;
+    FFormAdd: TFormAddDialog;
     FBase: TdwsJSONValue;
     procedure SetCurrentFileName(const Value: TFileName);
     procedure MenuItemRecentClicked(Sender: TObject);
@@ -186,7 +187,7 @@ implementation
 {$R *.dfm}
 
 uses
-  dwsXPlatform, System.Win.Registry, JsonEditor.About, JsonEditor.AddDialog;
+  dwsXPlatform, System.Win.Registry, JsonEditor.About;
 
 resourcestring
   RStrFileModified = 'The file has been modified.';
@@ -225,6 +226,7 @@ procedure TFormMain.FormDestroy(Sender: TObject);
 begin
   FRecentFiles.Free;
   TreeItems.Clear;
+  FFormAdd.Free;
   FBase.Free;
 end;
 
@@ -662,24 +664,29 @@ begin
   // the parent value must be an object
   Assert(ParentValue is TdwsJSONObject);
 
-  with TFormAddDialog.Create(Self) do
-  try
-    LabelValue.Visible := False;
-    EditValue.Visible := False;
+  // eventually create add dialog
+  if not Assigned(FFormAdd) then
+    FFormAdd := TFormAddDialog.Create(Self);
+
+  with FFormAdd do
+  begin
+    PanelName.Visible := True;
+    PanelValue.Visible := False;
+    ComboBoxName.Text := '';
+    ComboBoxValue.Text := '';
+
     if ShowModal = mrOk then
     begin
       Value := CreateArrayOrObject;
-      TdwsJSONObject(ParentValue).Add(EditName.Text, Value);
+      TdwsJSONObject(ParentValue).Add(ComboBoxName.Text, Value);
 
       // add node and link node to object
       Node := TreeItems.AddChild(Node);
       JsonNode := TreeItems.GetNodeData(Node);
       JsonNode^.Value := Value;
-      JsonNode^.Name := EditName.Text;
+      JsonNode^.Name := ComboBoxName.Text;
       UpdateEditor;
     end;
-  finally
-    Free;
   end;
 end;
 
@@ -712,33 +719,47 @@ begin
     end;
   end;
 
-  with TFormAddDialog.Create(Self) do
-  try
-    if ParentValue is TdwsJSONArray then
-    begin
-      LabelName.Visible := False;
-      EditName.Visible := False;
-    end;
+  // eventually create add dialog
+  if not Assigned(FFormAdd) then
+    FFormAdd := TFormAddDialog.Create(Self);
+
+  with FFormAdd do
+  begin
+    ComboBoxName.Text := '';
+    ComboBoxValue.Text := '';
+
+    PanelName.Visible := not (ParentValue is TdwsJSONArray);
 
     if ShowModal = mrOk then
     begin
-      // add array
+      // add create value
       Value := TdwsJSONImmediate.Create;
-      Value.AsString := EditValue.Text;
+      if RadioButtonString.Checked then
+        Value.AsString := ComboBoxValue.Text
+      else if RadioButtonNumber.Checked then
+      try
+        Value.AsNumber := StrToFloat(ComboBoxValue.Text)
+      except
+        Value.Free;
+        Exit;
+      end
+      else if RadioButtonBoolean.Checked then
+        Value.AsBoolean := Boolean(ComboBoxValue.ItemIndex)
+      else
+        Value.IsNull := True;
+
       if ParentValue is TdwsJSONArray then
         TdwsJSONArray(ParentValue).Add(Value)
       else
-        TdwsJSONObject(ParentValue).Add(EditName.Text, Value);
+        TdwsJSONObject(ParentValue).Add(ComboBoxName.Text, Value);
 
       // add node and link node to object
       Node := TreeItems.AddChild(Node);
       JsonNode := TreeItems.GetNodeData(Node);
       JsonNode^.Value := Value;
-      JsonNode^.Name := EditName.Text;
+      JsonNode^.Name := ComboBoxName.Text;
       UpdateEditor;
     end;
-  finally
-    Free;
   end;
 end;
 

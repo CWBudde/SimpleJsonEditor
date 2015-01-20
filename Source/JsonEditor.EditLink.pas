@@ -93,7 +93,7 @@ end;
 
 procedure TPropertyEditLink.EditKeyPress(Sender: TObject; var Key: Char);
 begin
-  if not CharInSet(Key, [#1..#31, '0'..'9', DecimalSeparator]) then
+  if not CharInSet(Key, [#1..#31, 'e', 'E', '0'..'9', FormatSettings.DecimalSeparator]) then
     Key := #0;
 end;
 
