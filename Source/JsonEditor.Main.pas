@@ -20,7 +20,7 @@ uses
   VirtualTrees,
 
   (* Custom *)
-  JsonEditor.EditLink, JsonEditor.AddDialog;
+  JsonEditor.EditLink, JsonEditor.AddDialog, SynEditHighlighter, System.Actions;
 
 type
   TVirtualStringTree = class(VirtualTrees.TVirtualStringTree)
@@ -158,7 +158,7 @@ type
     procedure TreeItemsKeyDown(Sender: TObject; var Key: Word;
       Shift: TShiftState);
   private
-    FHighlighter: TSynJSON;
+    FHighlighter: TSynJSONSyn;
     FCurrentFileName: TFileName;
     FRecentFiles: TStringList;
     FFormAdd: TFormAddDialog;
@@ -214,7 +214,7 @@ end;
 
 procedure TFormMain.FormCreate(Sender: TObject);
 begin
-  FHighlighter := TSynJSON.Create(SynEdit);
+  FHighlighter := TSynJSONSyn.Create(SynEdit);
   SynEdit.Highlighter := FHighlighter;
 
   TreeItems.NodeDataSize := SizeOf(TJsonNode);
